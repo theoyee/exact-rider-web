@@ -83,3 +83,4 @@ Tests cover amount handling, input validation, quote clocks, proxy restrictions,
 The provided contract ends at accepted/cancelled/expired requests. It does not expose confirmed journey start/completion, driver vehicle/contact details, online payment settlement, ratings, or reward redemption. Those screens explain availability rather than presenting fake success. The support address and marketing imagery are retained from the mobile UI and should be confirmed before public launch.
 
 Before production launch, run a two-device live ride test, confirm backend/provider origin restrictions, verify support details and reward terms, and integrate the missing lifecycle/payment endpoints as they become available.
+# exact-rider-web
