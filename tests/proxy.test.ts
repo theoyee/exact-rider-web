@@ -29,6 +29,19 @@ describe('restricted backend proxy', () => {
     expect(options.headers.get('Authorization')).toBe('Bearer action-token');
     expect(options.body).toBe('{"fareMinor":350000}');
   });
+  it('accepts the browser host when Next uses an internal bind address', async () => {
+    vi.stubEnv('API_ORIGIN', 'https://backend.example.test');
+    const fetch = vi.fn().mockResolvedValue(Response.json({ quoteId: 'quote' }, { status: 201 }));
+    vi.stubGlobal('fetch', fetch);
+    const context = { params: Promise.resolve({ path: ['api', 'v1', 'rides', 'quotes'] }) };
+    const response = await POST(new Request('http://0.0.0.0:3000/api/backend/api/v1/rides/quotes', { method: 'POST', headers: { Host: 'localhost:3000', Origin: 'http://localhost:3000' }, body: '{}' }), context);
+    expect(response.status).toBe(201);
+    expect(fetch).toHaveBeenCalledOnce();
+    fetch.mockClear();
+    const cross = await POST(new Request('http://0.0.0.0:3000/api/backend/api/v1/rides/quotes', { method: 'POST', headers: { Host: 'localhost:3000', Origin: 'https://other.example' }, body: '{}' }), context);
+    expect(cross.status).toBe(403);
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it('rejects cross-origin mutation attempts and oversized bodies', async () => {
     vi.stubEnv('API_ORIGIN', 'https://backend.example.test');
     const context = { params: Promise.resolve({ path: ['api', 'v1', 'rides', 'requests'] }) };

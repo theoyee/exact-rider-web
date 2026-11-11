@@ -127,6 +127,9 @@ export async function validateRiderQuote(quoteId: string): Promise<'valid' | 'ex
 }
 
 const errorMessages: Record<string, string> = {
+  INVALID_ORIGIN: 'The ride service rejected this site address. Reload the page and try again.',
+  BACKEND_NOT_CONFIGURED: 'The ride service connection is not configured on this website.',
+  BACKEND_UNAVAILABLE: 'This website could not reach the ride service. Please try again shortly.',
   PICKUP_OUTSIDE_OPERATING_ZONES: 'Pickup is outside the current service area.',
   NO_REFERENCE_LOCATION: 'No simulated driver is near this pickup. Try a location near Ikeja City Mall, Allen Avenue or Maryland.',
   NO_REACHABLE_REFERENCE: 'The nearby simulated drivers have no available road route to this pickup.',

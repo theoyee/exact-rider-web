@@ -6,7 +6,10 @@ async function proxy(request: Request, context: { params: Promise<{ path: string
   if (!allowedBackendPath(resource, request.method)) return Response.json({ error: { code: 'NOT_FOUND' } }, { status: 404 });
   const origin = process.env.API_ORIGIN?.replace(/\/+$/, '');
   if (!origin || !/^https?:\/\//.test(origin)) return Response.json({ error: { code: 'BACKEND_NOT_CONFIGURED' } }, { status: 503 });
-  if (request.method !== 'GET' && request.headers.get('origin') && request.headers.get('origin') !== new URL(request.url).origin) return Response.json({ error: { code: 'INVALID_ORIGIN' } }, { status: 403 });
+  const requestUrl = new URL(request.url);
+  // Next.js may use its bind address internally; Host is the browser-facing authority.
+  const publicOrigin = new URL(`${requestUrl.protocol}//${request.headers.get('host') || requestUrl.host}`).origin;
+  if (request.method !== 'GET' && request.headers.get('origin') && request.headers.get('origin') !== publicOrigin) return Response.json({ error: { code: 'INVALID_ORIGIN' } }, { status: 403 });
   try {
     const body = request.method === 'GET' ? undefined : await request.text();
     if (body && new TextEncoder().encode(body).length > 16384) return Response.json({ error: { code: 'BODY_TOO_LARGE' } }, { status: 413 });

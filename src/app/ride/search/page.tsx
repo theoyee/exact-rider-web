@@ -17,7 +17,7 @@ export default function SearchPage() {
   const router = useRouter();
   const now = useClock();
   const [cancelOpen, setCancelOpen] = useState(false);
-  const [offer, setOffer] = useState(() => Math.round((active?.status.counterFareMinor ?? active?.status.estimatedFareMinor ?? 0) / 100));
+  const [offer, setOffer] = useState(() => Math.round((active?.status.counterFareMinor ?? active?.status.estimatedFareMinor ?? active?.status.knownSubtotalMinor ?? 0) / 100));
   useEffect(() => { if (ride.status?.status === 'accepted') router.replace('/ride/track'); }, [ride.status?.status, router]);
   if (!active || !ride.status) return <EmptyState title="No ride request yet." text="Plan your trip and send a request to find an available driver." />;
   const status = ride.status;

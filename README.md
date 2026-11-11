@@ -37,8 +37,8 @@ Maps fall back to OpenStreetMap tiles without a Mapbox token; manual latitude/lo
 
 - `/`: branded, responsive welcome page, perks, and active-ride resume.
 - `/ride`: address autocomplete, precise place resolution, manual addresses/coordinates, browser GPS, live quote request.
-- `/ride/estimate`: backend fare/route, incomplete-pricing guard, server-clock-adjusted expiry, validity check, refresh.
-- `/ride/details`: contact validation and guarded request submission.
+- `/ride/estimate`: backend fare/route, subtotal disclosure and continuation, server-clock-adjusted expiry, validity check, refresh.
+- `/ride/details`: contact validation and backend-authorized request submission (including subtotal quotes; backend rejections remain visible).
 - `/ride/search`: authoritative status polling plus Socket.IO updates, driver counter-offers, rider counter-offers, server-confirmed cancellation.
 - `/ride/track`: accepted driver/fare, actual GPS marker and freshness, pickup proximity, arrival chime, route sharing, support.
 - `/ride/payment`, `/ride/completed`, `/ride/feedback`: explicit unavailable/pending states until supported by the backend. No fabricated payment, completion, or feedback submissions.

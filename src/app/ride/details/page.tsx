@@ -25,7 +25,7 @@ export default function DetailsPage() {
   const expired = remainingQuoteSeconds(quote, now) === 0;
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (inFlight.current || expired || !validRider(details.fullName, details.email, details.phone) || quote.status !== 'complete') return;
+    if (inFlight.current || expired || !validRider(details.fullName, details.email, details.phone)) return;
     inFlight.current = true; setBusy(true); setError(null);
     try {
       if (await validateRiderQuote(quote.quoteId) === 'expired') { setError('Your estimate expired. Go back and refresh it.'); return; }
@@ -36,13 +36,14 @@ export default function DetailsPage() {
     finally { inFlight.current = false; setBusy(false); }
   };
   return <div className="animate-enter"><PageHeading title="Let’s make it your ride." back="/ride/estimate" description="A few details so your driver knows who to look out for." />
-    <div className="mb-7 flex items-center justify-between rounded-xl bg-blue-50 px-4 py-3.5 text-sm"><span className="text-zinc-600">Your estimate</span><strong className="font-medium text-blue-600">{money(quote.estimatedFareMinor ?? quote.knownSubtotalMinor)}</strong></div>
+    <div className="mb-7 flex items-center justify-between rounded-xl bg-blue-50 px-4 py-3.5 text-sm"><span className="text-zinc-600">{quote.status === 'complete' ? 'Your estimate' : 'Known cost subtotal'}</span><strong className="font-medium text-blue-600">{money(quote.estimatedFareMinor ?? quote.knownSubtotalMinor)}</strong></div>
+    {quote.status !== 'complete' && <p role="status" className="mb-5 rounded-xl bg-amber-50 p-4 text-sm leading-6 text-amber-900">Some charges are still being calculated. This subtotal is not a confirmed fare. Submit your details to check whether driver search is available for this quote.</p>}
     <form onSubmit={submit} className="space-y-5"><fieldset disabled={busy} className="space-y-5">{([{ key: 'fullName', label: 'Full name', placeholder: 'Your first and last name', type: 'text', autoComplete: 'name', Icon: UserRound }, { key: 'email', label: 'Email address', placeholder: 'you@example.com', type: 'email', autoComplete: 'email', Icon: Mail }, { key: 'phone', label: 'Phone number', placeholder: '0801 234 5678', type: 'tel', autoComplete: 'tel', Icon: Phone }] as const).map(({ key, label, placeholder, type, autoComplete, Icon }) => <label key={key} className="block"><span className="mb-2 block text-xs font-medium text-zinc-500">{label}</span><div className="relative"><Icon size={17} className="absolute top-[18px] left-4 text-zinc-400" /><input required maxLength={key === 'fullName' ? 100 : 160} type={type} autoComplete={autoComplete} value={details[key]} placeholder={placeholder} onChange={event => setDetails(current => ({ ...current, [key]: event.target.value }))} className="field pl-11" /></div></label>)}</fieldset>
       <p className="text-xs leading-5 text-zinc-400">Your details are shared with the ride service to arrange your trip. Phone numbers must be Nigerian numbers.</p>
       {expired && <ErrorNotice message="Your estimate has expired. Refresh it before requesting a driver." />}
       <ErrorNotice message={error} />
-      <Button type="submit" busy={busy} disabled={expired || quote.status !== 'complete' || !validRider(details.fullName, details.email, details.phone)} className="w-full">{busy ? 'Sending your request…' : 'Find my driver'}{!busy && <ArrowRight size={18} />}</Button>
-      {expired && <Link href="/ride/estimate" className="block text-center text-sm text-blue-600">Refresh estimate</Link>}
+      <Button type="submit" busy={busy} disabled={expired || !validRider(details.fullName, details.email, details.phone)} className="w-full">{busy ? 'Sending your request…' : 'Find my driver'}{!busy && <ArrowRight size={18} />}</Button>
+      {(expired || error) && <Link href="/ride/estimate" className="block text-center text-sm text-blue-600">Refresh estimate</Link>}
       <TrustNote />
     </form>
   </div>;

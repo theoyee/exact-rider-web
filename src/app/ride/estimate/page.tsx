@@ -40,10 +40,10 @@ export default function EstimatePage() {
     <div className="mb-6 flex items-end justify-between"><div><p className="text-xs text-zinc-400">{complete ? 'Price estimate' : 'Known cost subtotal'}</p><p className="mt-2 text-[38px] font-medium leading-none tracking-[-1.5px] text-blue-600">{money(quote.estimatedFareMinor ?? quote.knownSubtotalMinor)}</p></div><span className="mb-1 text-xs text-zinc-400">NGN</span></div>
     <TripSummary />
     <div className="mt-5 flex items-center gap-2 text-xs text-zinc-500"><ShieldCheck size={15} className="text-green-600" />Your driver and fare are confirmed after acceptance.</div>
-    {!complete && <ErrorNotice message="Some charges are unresolved. This estimate cannot be booked yet. Refresh or try a different trip." />}
+    {!complete && <p role="status" className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">This is a subtotal; some charges are still being calculated. Continue to enter your details and request a driver. The ride service will confirm whether this estimate can be requested.</p>}
     <div aria-live="polite" className={`my-6 flex items-center justify-center gap-2 rounded-lg py-3 text-xs ${remaining ? 'bg-zinc-50 text-zinc-500' : 'bg-amber-50 text-amber-800'}`}><Clock3 size={14} />{remaining ? <>This estimate expires in <strong className="text-zinc-800">{formatQuoteCountdown(remaining)}</strong></> : 'This estimate has expired.'}</div>
     <ErrorNotice message={error} />
-    {remaining && complete ? <Button busy={busy} onClick={() => void proceed()} className="w-full">Continue<ArrowRight size={18} /></Button> : <Button busy={busy} onClick={() => void refresh()} className="w-full">Refresh estimate</Button>}
+    {remaining ? <Button busy={busy} onClick={() => void proceed()} className="w-full">Continue<ArrowRight size={18} /></Button> : <Button busy={busy} onClick={() => void refresh()} className="w-full">Refresh estimate</Button>}
     <Link href="/ride" className="mt-4 block py-2 text-center text-xs text-zinc-500 underline underline-offset-4">Edit trip locations</Link>
   </div>;
 }

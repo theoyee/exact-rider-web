@@ -2,7 +2,9 @@ import { expect, test, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 const quoteId = '12345678-1234-4234-8234-123456789abc';
 const requestId = '87654321-4321-4321-8321-123456789abc';
-async function mockService(page: Page) {
+async function mockService(page: Page, options: { incomplete?: boolean; rejectIncomplete?: boolean; expired?: boolean } = {}) {
+  const pricingStatus = options.incomplete ? 'unresolved_charges' : 'complete';
+  const estimatedFareMinor = options.incomplete ? null : 320000;
   let created = 0;
   let phase = 'submitted';
   const pickup = { latitude: 6.6018, longitude: 3.3515 };
@@ -13,20 +15,22 @@ async function mockService(page: Page) {
     const q = url.searchParams.get('q') || '';
     return route.fulfill({ json: { suggestions: [{ placeId: q.includes('Allen') ? 'pickup-place' : 'destination-place', label: q.includes('Allen') ? 'Allen Avenue, Ikeja, Lagos' : 'Ikeja City Mall, Lagos' }] } });
   });
-  const status = () => ({ requestId, quoteId, status: phase, estimatedFareMinor: 320000, knownSubtotalMinor: 320000, counterFareMinor: phase === 'countered' ? 350000 : null, acceptedFareMinor: phase === 'accepted' ? 350000 : null, acceptedDriverName: phase === 'accepted' ? 'Ada Okafor' : null, offerExpiresAt: new Date(Date.now() + 120000).toISOString(), pricingStatus: 'complete', searchMode: 'real_driver', simulatedReference: null, createdAt: new Date().toISOString() });
+  const status = () => ({ requestId, quoteId, status: phase, estimatedFareMinor, knownSubtotalMinor: 320000, counterFareMinor: phase === 'countered' ? 350000 : null, acceptedFareMinor: phase === 'accepted' ? 350000 : null, acceptedDriverName: phase === 'accepted' ? 'Ada Okafor' : null, offerExpiresAt: new Date(Date.now() + 120000).toISOString(), pricingStatus, searchMode: 'real_driver', simulatedReference: null, createdAt: new Date().toISOString() });
   await page.route('**/api/backend/api/v1/**', async route => {
     const url = new URL(route.request().url());
     const path = url.pathname;
+    if (path.endsWith('/validity') && options.expired) return route.fulfill({ status: 410, json: { error: { code: 'QUOTE_EXPIRED' } } });
     if (path.endsWith('/validity')) return route.fulfill({ json: { quoteId, valid: true, expiresAt: new Date(Date.now() + 120000).toISOString() } });
     if (path.endsWith('/quotes')) return route.fulfill({ json: {
-      quoteId, pickup, destination, driverAssignment: 'none', status: 'complete',
-      pricing: { knownSubtotalMinor: 320000, estimatedFareMinor: 320000, completeness: 'complete', vehicleCategory: 'standard', currency: 'NGN', pricingVersion: 1 },
+      quoteId, pickup, destination, driverAssignment: 'none', status: pricingStatus,
+      pricing: { knownSubtotalMinor: 320000, estimatedFareMinor, completeness: pricingStatus, vehicleCategory: 'standard', currency: 'NGN', pricingVersion: 1 },
       referenceEstimate: { referenceId: 'driver-id', source: 'driver_presence', distanceMeters: 1000, durationSeconds: 180 },
       passengerTrip: { provider: 'mapbox', geometry: { type: 'LineString', coordinates: [[3.3515, 6.6018], [3.352, 6.59], [3.3527, 6.5834]] }, distanceMeters: 3200, durationSeconds: 600, traffic: { aware: false, condition: 'unknown', source: 'unavailable' }, trafficSegments: { type: 'FeatureCollection', features: [] }, calculatedAt: new Date().toISOString() },
       expiresAt: new Date(Date.now() + 120000).toISOString(), serverNow: new Date().toISOString(),
     } });
     if (path.endsWith('/requests') && route.request().method() === 'POST') {
       created++;
+      if (options.rejectIncomplete) return route.fulfill({ status: 422, json: { error: { code: 'QUOTE_INCOMPLETE' } } });
       expect(JSON.parse(route.request().postData() || '{}')).toMatchObject({ quoteId, fullName: 'Ada Rider' });
       return route.fulfill({ json: { ...status(), actionToken: 'action-token' } });
     }
@@ -37,7 +41,7 @@ async function mockService(page: Page) {
   });
   return { created: () => created, counter: () => { phase = 'countered'; } };
 }
-async function requestRide(page: Page) {
+async function requestRide(page: Page, expectSearch = true) {
   await page.goto('/ride');
   await page.getByRole('combobox', { name: 'Pick up', exact: true }).fill('Allen');
   await page.getByRole('option', { name: 'Allen Avenue, Ikeja, Lagos' }).click();
@@ -51,7 +55,7 @@ async function requestRide(page: Page) {
   await page.getByLabel('Email address').fill('ada@example.com');
   await page.getByLabel('Phone number').fill('08012345678');
   await page.getByRole('button', { name: 'Find my driver' }).click();
-  await expect(page).toHaveURL(/\/ride\/search/);
+  if (expectSearch) await expect(page).toHaveURL(/\/ride\/search/);
 }
 test('request, negotiate, accept, recover session, and guard unconfirmed payment', async ({ page }) => {
   const service = await mockService(page);
@@ -93,4 +97,36 @@ test('welcome and direct-entry guards work on this viewport', async ({ page }, t
   await expect(page.getByRole('heading', { name: 'Your ride starts here.' })).toBeVisible();
   await page.goto('/ride/estimate');
   await expect(page.getByRole('heading', { name: 'Let’s plan your trip first.' })).toBeVisible();
+});
+
+test('subtotal quotes can continue to backend-authorized driver search', async ({ page }) => {
+  const service = await mockService(page, { incomplete: true });
+  await requestRide(page);
+  expect(service.created()).toBe(1);
+  await expect(page.getByLabel('Want to suggest a different fare?')).toHaveValue('3200');
+  await page.getByRole('button', { name: 'Send counter offer' }).click();
+  await expect(page.getByText('Driver’s counter offer')).toBeVisible();
+});
+test('backend incomplete-quote rejection stays on details with recovery', async ({ page }) => {
+  const service = await mockService(page, { incomplete: true, rejectIncomplete: true });
+  await requestRide(page, false);
+  await expect(page.getByRole('alert').filter({ hasText: 'unresolved charges' })).toBeVisible();
+  await expect(page).toHaveURL(/\/ride\/details/);
+  expect(service.created()).toBe(1);
+  await page.getByRole('link', { name: 'Refresh estimate' }).click();
+  await expect(page).toHaveURL(/\/ride\/estimate/);
+  await expect(page.getByRole('status').filter({ hasText: 'This is a subtotal' })).toBeVisible();
+});
+test('expired subtotal quote cannot proceed to details', async ({ page }) => {
+  const service = await mockService(page, { incomplete: true, expired: true });
+  await page.goto('/ride');
+  await page.getByRole('combobox', { name: 'Pick up', exact: true }).fill('Allen');
+  await page.getByRole('option', { name: 'Allen Avenue, Ikeja, Lagos' }).click();
+  await page.getByRole('combobox', { name: 'Destination', exact: true }).fill('Ikeja');
+  await page.getByRole('option', { name: 'Ikeja City Mall, Lagos' }).click();
+  await page.getByRole('button', { name: 'See my estimate' }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Your estimate expired.' })).toBeVisible();
+  await expect(page).toHaveURL(/\/ride\/estimate/);
+  expect(service.created()).toBe(0);
 });
